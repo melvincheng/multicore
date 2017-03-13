@@ -93,8 +93,8 @@ int main(int argc, char *argv[]) {
     exit(-1);
   }
   //Activity #3
-  for(i=0; i < NUM_BROKER; i++){
-    error = pthread_create(&threads[i], &attr, stock_broker, (void *) &test[i]);
+  for(i=1; i < NUM_BROKER + 1; i++){
+    error = pthread_create(&threads[i], &attr, stock_broker, (void *) &test[i - 1]);
     if (error) {
       printf("ERROR: create() buy_stock: %d\n", error);
       exit(-1);
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
   for (i=0; i < NUM_THREADS; i++) {
     error = pthread_join(threads[i], NULL);
     if (error) {
-      printf("ERROR: join() thread %d: %d\n", i, error);
+      printf("ERROR: join() broker %d: %d\n", i, error);
       exit(-1);
     }
   }
@@ -140,7 +140,7 @@ void *stock_broker(void *t) {
   for(int i = 0; i < NUM_STOCKS; i++){
     error = pthread_join(threads[i], NULL);
     if (error) {
-      printf("ERROR: join() thread %d: %d\n", i, error);
+      printf("ERROR: join() monitor %d: %d\n", i, error);
       exit(-1);
     }
   }
@@ -154,7 +154,7 @@ void *stock_exchange(void *t) {
   int day;
   srand(time(NULL));
   sleep(2); // waits for the monitor threads to start
-  for (day=0; day < 3; day++) {
+  for (day=0; day < 365; day++) {
     printf("day = %d\n", day);
     update_stock(0, rand()%3, (rand()%10 - 3.6)/2.3);
     update_stock(1, rand()%7, (rand()%12 - 5)/2.3);
@@ -164,7 +164,7 @@ void *stock_exchange(void *t) {
   stock_exchange_exit = 0;
   for(int i = 0; i < NUM_BROKER; i++){
     for(int j = 0; j < NUM_STOCKS; j++){
-      pthread_cond_signal_all(&my_stock_price_cond[j]);
+      pthread_cond_broadcast(&my_stock_price_cond[j]);
     }
   }
   pthread_exit(NULL);
@@ -198,7 +198,6 @@ void *stock_monitor(void *t){
     }
     pthread_mutex_unlock(&my_stock_mutex[id]);
   }
-  printf("Broker: %c Stock: %c exit\n", data->broker_name, data->name);
   pthread_exit(NULL);
 }
 
@@ -211,7 +210,7 @@ void update_stock(int id, int chance, float price_var) {
       my_stock[id].price += price_var;
     }
 
-    pthread_cond_signal_all(&my_stock_price_cond[id]);
+    pthread_cond_broadcast(&my_stock_price_cond[id]);
     printf("Stock price of %c: $%f\n", my_stock[id].name, my_stock[id].price);
     pthread_mutex_unlock(&my_stock_mutex[id]);
   }
