@@ -49,6 +49,25 @@
 //
 
 ////////////////////////////////////////////////////////////////////////////////
+/*	
+ *	ACTIVITY 2
+ *
+ *  The efficiency problem with this is that there are a large number of compute units but a small number of calculations
+ *
+ *	In order to improve the parallelization, instead of assign one term of the new matrix to each compute units, we can assign 
+ *	each unit to calculate a part of the dot product. Each unit calculates a product which is part of the dot product.
+ *	
+ *	EXAMPLE
+ *	Matrix A 		Matrix B
+ *	|a 	b| 			|e 	f|
+ *	|c 	d|			|g 	h|
+ *  
+ *	|ae + bg 	af + bh| 
+ *	|ce + dg 	cf + dh|
+ * 	Instead of one unit computing ae + bg
+ *	One unit will now calculate ae and another will calculate bg
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -85,9 +104,7 @@ const char *KernelSource = "\n" \
 "   for (int k=0; k< k_dim; k++) {                                      \n" \
 "       temp +=  a[(m*k_dim+k)] * b[(k*n_dim+n)];                       \n" \
 "   }                                                                   \n" \
-"   if(n < n_dim && m < m_dim){                                         \n" \
-"       ab[(m*n_dim+n)] = temp;                                         \n" \
-"   }                                                                   \n" \
+"   ab[(m*n_dim+n)] = temp;                                             \n" \
 "}                                                                      \n" \
 "\n";
 
@@ -112,7 +129,7 @@ int main(int argc, char** argv)
     unsigned int correct;               // number of correct results returned
 
     size_t global[2];                      // global domain size for our calculation
-    size_t local[2];                       // local domain size for our calculation
+    size_t local;                       // local domain size for our calculation
 
     cl_platform_id platform_id;
     cl_uint num_platforms;
@@ -146,12 +163,10 @@ int main(int argc, char** argv)
         printf("\n");
     }
 
-    err = clGetPlatformIDs(1,&platform_id,&num_platforms);
-
     // Connect to a compute device
     //
-    int gpu = 0;
-    err = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_CPU, 1, &device_id, NULL);
+    int gpu = 1;
+    err = clGetDeviceIDs(NULL, gpu ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_CPU, 1, &device_id, NULL);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to create a device group!\n");
@@ -256,11 +271,9 @@ int main(int argc, char** argv)
     // Execute the kernel over the entire range of our 1d input data set
     // using the maximum number of work group items for this device
     //
-    local[0] = 16;
-    local[1] = 16;
-    global[0] = DATA_SIZE;
-    global[1] = DATA_SIZE;
-    err = clEnqueueNDRangeKernel(commands, kernel, 2, NULL, global, local, 0, NULL, NULL);
+    global[0] = md;
+    global[1] = nd;
+    err = clEnqueueNDRangeKernel(commands, kernel, 2, NULL, global, NULL, 0, NULL, NULL);
     if (err)
     {
         printf("Error: Failed to execute kernel!\n");
